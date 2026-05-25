@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/KronusRodion/ksink/internal/ports"
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
 // Batch holds a decoded batch of messages with a single commit for the whole batch.
 type Batch[Payload any] struct {
-	Messages   []Payload
+	payload   []Payload
 	commitFunc func(ctx context.Context) error
 }
 
@@ -18,6 +19,10 @@ type Batch[Payload any] struct {
 // Must be called after successful ClickHouse write.
 func (b *Batch[I]) Commit(ctx context.Context) error {
 	return b.commitFunc(ctx)
+}
+
+func (b *Batch[I]) Payload() ([]I) {
+	return b.payload
 }
 
 type Kafka[Output any] struct {
@@ -34,8 +39,8 @@ func NewKafkaConsumer[Output any](client *kgo.Client, batchSize int) *Kafka[Outp
 
 // Consume polls Kafka and sends decoded batches into the returned channel.
 // Caller MUST call batch.Commit() after successfully processing of batch.
-func (k *Kafka[I]) Consume(ctx context.Context) (<-chan *Batch[I], <-chan error) {
-	out := make(chan *Batch[I], 1)
+func (k *Kafka[I]) Consume(ctx context.Context) (<-chan ports.Batch[I], <-chan error) {
+	out := make(chan ports.Batch[I], 1)
 	errc := make(chan error, 1)
 
 	go func() {
@@ -72,7 +77,7 @@ func (k *Kafka[I]) Consume(ctx context.Context) (<-chan *Batch[I], <-chan error)
 			}
 
 			// Empty poll (e.g. timeout with no new messages) — just continue
-			if len(batch.Messages) == 0 {
+			if len(batch.payload) == 0 {
 				continue
 			}
 
@@ -118,7 +123,7 @@ func (k *Kafka[I]) buildBatch(fetches kgo.Fetches) (*Batch[I], error) {
 	}
 
 	batch := &Batch[I]{
-		Messages: messages,
+		payload: messages,
 		commitFunc: func(ctx context.Context) error {
 			return k.client.CommitRecords(ctx, records...)
 
