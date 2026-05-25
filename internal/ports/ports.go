@@ -7,6 +7,10 @@ type Batch[I any] interface {
 	Commit(context.Context) error
 }
 
+type Ingester interface {
+	Run(ctx context.Context) error
+}
+
 type Consumer[I any] interface {
 	Consume(ctx context.Context) (<-chan Batch[I], <-chan error)
 }

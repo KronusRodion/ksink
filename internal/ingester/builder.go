@@ -1,4 +1,4 @@
-package ingestor
+package ingester
 
 import (
 	"errors"
@@ -19,28 +19,29 @@ type Builder[I, O any] struct {
 	handler ports.Process[I, O]
 }
 
-
-func (b *Builder[I, O]) WithKafkaConsumer(client *kgo.Client, batchSize int) {
+func (b *Builder[I, O]) WithKafkaConsumer(client *kgo.Client, batchSize int) *Builder[I, O] {
 	cons := consumer.NewKafkaConsumer[I](client, batchSize)
 	b.consumer = cons
+	return b
 }
 
-func (b *Builder[I, O]) WithClickHouse(conn clickhouse.Conn, table string, columns []string, mapper producer.RowMapper[O]) {
+func (b *Builder[I, O]) WithClickHouse(conn clickhouse.Conn, table string, columns []string, mapper producer.RowMapper[O]) *Builder[I, O] {
 	b.producer = producer.NewClickHouseProducer(conn, table, columns, mapper)
-	
+	return b
 }
 
-func (b *Builder[I, O]) WithHandler(handler ports.Process[I, O]) {
+func (b *Builder[I, O]) WithHandler(handler ports.Process[I, O]) *Builder[I, O] {
 	b.handler = handler
+	return b
 }
 
-func (b *Builder[I, O]) Build() (ingestor[I, O], error) {
+func (b *Builder[I, O]) Build() (ingester[I, O], error) {
 	err := b.validate()
 	if err != nil {
-		return ingestor[I, O]{}, err
+		return ingester[I, O]{}, err
 	}
-	
-	return ingestor[I, O]{consumer: b.consumer, Producer: b.producer, handler: b.handler}, nil
+
+	return ingester[I, O]{consumer: b.consumer, producer: b.producer, handler: b.handler}, nil
 }
 
 func (b *Builder[I, O]) validate() error {
